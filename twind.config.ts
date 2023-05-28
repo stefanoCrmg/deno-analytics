@@ -1,11 +1,9 @@
 import { Options } from "$fresh/plugins/twindv1.ts"
 import { defineConfig, Preset } from "twind"
-// twind preset
 import presetAutoPrefix from "twind-preset-autoprefix"
 import presetTailWind from "twind-preset-tailwind"
 import * as colors from "twind-preset-tailwind-colors"
 
-/** @todo Remove the need for type-assertions */
 export default {
   selfURL: import.meta.url,
   ...defineConfig({
@@ -22,6 +20,14 @@ export default {
         // deno-lint-ignore no-explicit-any
       }) as Preset<any>,
     ],
+    theme: {
+      extend: {
+        backgroundImage: {
+          "deno-pattern": "url('/background-pattern.svg')",
+          "dark-deno-pattern": "url('/background-pattern-dark.svg')",
+        },
+      },
+    },
     darkMode: "class",
   }),
 } as Options

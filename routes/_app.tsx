@@ -18,7 +18,10 @@ export default function App({ Component }: AppProps) {
         />
         <meta name="theme-color" />
       </Head>
-      <body class="bg(gray-100 dark:cyan-900) dark:text-gray-100">
+      <body class="dark:text-gray-100
+                    bg(deno-pattern gray-100
+                       dark:dark-deno-pattern dark:sky-800
+                    )">
         <main class="container mx-auto p-4">
           <Component />
         </main>

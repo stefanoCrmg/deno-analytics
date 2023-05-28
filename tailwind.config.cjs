@@ -2,7 +2,12 @@
 module.exports = {
   content: ["./src/**/*.{html,js}"],
   theme: {
-    extend: {},
+    extend: {
+      backgroundImage: {
+        "deno-pattern": "url('/background-pattern.svg')",
+        "dark-deno-pattern": "url('/background-pattern-dark.svg')",
+      },
+    },
   },
   plugins: [],
 }
