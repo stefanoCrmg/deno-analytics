@@ -7,7 +7,7 @@ import { apply, flow, pipe } from "https://esm.sh/fp-ts/function"
 import * as t from "https://esm.sh/io-ts"
 import Logger from "https://deno.land/x/logger/logger.ts"
 
-const logger = new Logger()
+export const logger = new Logger()
 
 const runReaderTaskEither: <R, E, A>(
   r: R,
@@ -76,7 +76,7 @@ export const get = <A, O = A>(
     )
   )
 
-const runKv =
+export const runKv =
   () => <E, A>(rte: RTE.ReaderTaskEither<DbEnv, E, A>): Promise<void> =>
     pipe(
       connectToKV,
@@ -87,9 +87,3 @@ const runKv =
       ),
       (task) => task(),
     )
-
-pipe(
-  set(["pippo"], "melissa"),
-  RTE.flatMap(() => get(["pippo"], t.string)),
-  runKv(),
-)
