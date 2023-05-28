@@ -1,4 +1,5 @@
 // Copyright 2023 the Deno authors. All rights reserved. MIT license.
+/// <reference lib="deno.unstable" />
 /// <reference no-default-lib="true" />
 /// <reference lib="dom" />
 /// <reference lib="dom.iterable" />
