@@ -1,19 +1,12 @@
-import * as RTE from "https://esm.sh/fp-ts/ReaderTaskEither"
-import * as TE from "https://esm.sh/fp-ts/TaskEither"
-import * as O from "https://esm.sh/fp-ts/Option"
-import * as E from "https://esm.sh/fp-ts/Either"
-import { apply, flow, pipe } from "https://esm.sh/fp-ts/function"
+import * as RTE from "https://esm.sh/fp-ts@2.16.0/ReaderTaskEither"
+import * as TE from "https://esm.sh/fp-ts@2.16.0/TaskEither"
+import * as O from "https://esm.sh/fp-ts@2.15.0/Option"
+import * as E from "https://esm.sh/fp-ts@2.16.0/Either"
+import { flow, pipe } from "https://esm.sh/fp-ts@2.16.0/function"
+import * as t from "https://esm.sh/io-ts@2.2.20"
+import Logger from "https://deno.land/x/logger@v1.1.2/logger.ts"
 
-import * as t from "https://esm.sh/io-ts"
-import Logger from "https://deno.land/x/logger/logger.ts"
-
-export const logger = new Logger()
-
-const runReaderTaskEither: <R, E, A>(
-  r: R,
-) => (reader: RTE.ReaderTaskEither<R, E, A>) => TE.TaskEither<E, A> = apply
-
-class DecodingFailure {
+export class DecodingFailure {
   readonly _tag = "DecodingFailure"
   constructor(readonly errors: t.Errors) {}
 }
@@ -22,7 +15,7 @@ class KvConnectingError {
   constructor(readonly error: unknown) {}
 }
 
-class KvSetError {
+export class KvSetError {
   readonly _tag = "KvSetError"
   constructor(readonly error: unknown) {}
 }
@@ -31,19 +24,26 @@ class KvReadError {
   readonly _tag = "KvReadError"
   constructor(readonly error: unknown) {}
 }
-type DbEnv = {
+type DenoKvEnv = {
   readonly kv: Deno.Kv
 }
 
+type LoggerEnv = {
+  readonly logger: Logger
+}
+
+export type DbContextEnv = LoggerEnv & DenoKvEnv
 export type KvErrors = KvConnectingError | KvSetError
 
-export const connectToKV: TE.TaskEither<KvConnectingError, Deno.Kv> = TE
-  .tryCatch(() => Deno.openKv(), (e) => new KvConnectingError(e))
+export const connectToKV: () => TE.TaskEither<KvConnectingError, Deno.Kv> =
+  () =>
+    TE
+      .tryCatch(() => Deno.openKv(), (e) => new KvConnectingError(e))
 
 export const set = <A>(
   key: Deno.KvKey,
   value: A,
-): RTE.ReaderTaskEither<DbEnv, KvSetError, Deno.KvCommitResult> =>
+): RTE.ReaderTaskEither<DenoKvEnv, KvSetError, Deno.KvCommitResult> =>
   RTE.asksReaderTaskEither(({ kv }) =>
     pipe(
       TE.tryCatch(() => kv.set(key, value), (reason) => new KvSetError(reason)),
@@ -67,7 +67,11 @@ const validateEntry = <A, O = A>(schema: t.Type<A, O, unknown>) =>
 export const get = <A, O = A>(
   key: Deno.KvKey,
   schema: t.Type<A, O>,
-): RTE.ReaderTaskEither<DbEnv, KvReadError | DecodingFailure, O.Option<A>> =>
+): RTE.ReaderTaskEither<
+  DenoKvEnv,
+  KvReadError | DecodingFailure,
+  O.Option<A>
+> =>
   RTE.asksReaderTaskEither(({ kv }) =>
     pipe(
       TE.tryCatch(() => kv.get(key), (reason) => new KvReadError(reason)),
@@ -76,14 +80,30 @@ export const get = <A, O = A>(
     )
   )
 
-export const runKv =
-  () => <E, A>(rte: RTE.ReaderTaskEither<DbEnv, E, A>): Promise<void> =>
-    pipe(
-      connectToKV,
-      TE.chain((kv) => runReaderTaskEither({ kv })(rte)),
-      TE.match(
-        (err) => logger.error(`${JSON.stringify(err)}`),
-        (succ) => logger.info(`${JSON.stringify(succ)}`),
-      ),
-      (task) => task(),
-    )
+const createEnv = (): TE.TaskEither<KvConnectingError, DbContextEnv> => {
+  const logger = new Logger()
+  return pipe(
+    connectToKV(),
+    TE.map((kv) => ({ kv, logger })),
+  )
+}
+
+export const provideEnv = () =>
+<E, A>(
+  rte: RTE.ReaderTaskEither<DbContextEnv, E, A>,
+): TE.TaskEither<KvConnectingError | E, A> =>
+  pipe(
+    createEnv(),
+    TE.flatMap((env) =>
+      pipe(
+        rte(env),
+        TE.tapError((e) =>
+          TE.fromIO(() =>
+            env.logger.error(
+              `[${performance.now()} || ERROR] ${JSON.stringify(e)}`,
+            )
+          )
+        ),
+      )
+    ),
+  )
